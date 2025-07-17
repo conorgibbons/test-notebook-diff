@@ -19,7 +19,12 @@ jobs:
         python-version: '3.x'
 
     - name: Install nbdime
-      run: pip install "nbdime>=1.1.0"
+      run: |
+	pip install --upgrade nbdime
+	nbdime --version
+	# Also list arguments to see available options if the above fails
+        nbdime --help
+      shell: bash
 
     - name: Get changed notebooks
       id: changed_files
