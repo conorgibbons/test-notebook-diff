@@ -18,12 +18,11 @@ jobs:
       with:
         python-version: '3.x'
 
-    - name: Install nbdime
+    - name: Install and Verify nbdime
       run: |
-	pip install --upgrade nbdime
-	nbdime --version
-	# Also list arguments to see available options if the above fails
-        nbdime --help
+        pip install --upgrade nbdime
+        nbdime --version
+        nbdime diff --help # This will print help specifically for the 'diff' subcommand
       shell: bash
 
     - name: Get changed notebooks
@@ -39,38 +38,23 @@ jobs:
       if: steps.changed_files.outputs.changed_notebooks != ''
       run: |
         DIFF_COMMENT=""
-        # Iterate over each changed notebook path
         for NOTEBOOK_PATH in ${{ steps.changed_files.outputs.changed_notebooks }}; do
-          # Generate nbdime diff for the current notebook against the base branch
-          # --output-none: Exclude cell outputs
-          # --no-metadata: Exclude cell metadata
-          # --no-color: Remove ANSI color codes for cleaner output in GitHub comments
-          NB_DIFF=$(nbdime diff --output-none --no-metadata --no-color ${{ github.event.pull_request.base.sha }} $NOTEBOOK_PATH)
+          # Use --strip-outputs and --strip-metadata for better compatibility
+          NB_DIFF=$(nbdime diff --strip-outputs --strip-metadata --no-color ${{ github.event.pull_request.base.sha }} $NOTEBOOK_PATH)
           
-          # If nbdime produced a diff (i.e., there were actual code changes)
           if [ -n "$NB_DIFF" ]; then
             DIFF_COMMENT="${DIFF_COMMENT}\n---\n### Code Changes for \`${NOTEBOOK_PATH}\`\n\`\`\`diff\n${NB_DIFF}\n\`\`\`\n"
           fi
         done
 
         if [ -n "$DIFF_COMMENT" ]; then
-          # Use GitHub CLI (gh) to manage PR comments
-          # gh is pre-installed on GitHub Actions runners
-
-          # Try to find an existing comment to update it, identified by a hidden marker
           COMMENT_ID=$(gh pr comment list ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json id,body -q '.[] | select(.body | contains("")) | .id' || true)
-
-          # Get current timestamp for "Last updated" message
           CURRENT_TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
-
-          # Construct the full comment body
           FULL_COMMENT_BODY="This comment shows the code-only diff for Jupyter notebooks in this PR.\n*Last updated: ${CURRENT_TIMESTAMP}*\n\n${DIFF_COMMENT}\n"
 
           if [ -n "$COMMENT_ID" ]; then
-            # Update existing comment
             gh pr comment edit $COMMENT_ID --repo ${{ github.repository }} --body "$FULL_COMMENT_BODY"
           else
-            # Create a new comment
             gh pr comment create ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --body "$FULL_COMMENT_BODY"
           fi
         else
