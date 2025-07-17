@@ -1,0 +1,61 @@
+# .github/workflows/nbdime-pr-comment.yml
+name: Jupyter Notebook Diff on PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  generate_nb_diff:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # Needed to compare with base branch
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install nbdime
+      run: pip install nbdime
+
+    - name: Get changed notebooks
+      id: changed_files
+      run: |
+        COMMITS=$(git diff --name-only ${{ github.event.before }} ${{ github.event.after }} | grep ".ipynb$" | xargs)
+        echo "changed_notebooks=$COMMITS" >> $GITHUB_OUTPUT
+      shell: bash
+
+    - name: Generate and Comment nbdime diff
+      if: steps.changed_files.outputs.changed_notebooks != ''
+      run: |
+        DIFF_COMMENT=""
+        for NOTEBOOK_PATH in ${{ steps.changed_files.outputs.changed_notebooks }}; do
+          NB_DIFF=$(nbdime diff --output-none --no-metadata --no-color ${{ github.event.base.sha }} $NOTEBOOK_PATH)
+          if [ -n "$NB_DIFF" ]; then
+            DIFF_COMMENT="${DIFF_COMMENT}\n---\n### Code Changes for \`${NOTEBOOK_PATH}\`\n\`\`\`diff\n${NB_DIFF}\n\`\`\`\n"
+          fi
+        done
+
+        if [ -n "$DIFF_COMMENT" ]; then
+          # Get the existing comment ID if any, to update it instead of creating new ones
+          COMMENT_ID=$(gh pr comment list ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json id,body -q '.[] | select(.body | contains("")) | .id' || true)
+
+          # Add a timestamp to indicate when the diff was last updated
+          CURRENT_TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+
+          FULL_COMMENT_BODY="This comment shows the code-only diff for Jupyter notebooks in this PR.\n*Last updated: ${CURRENT_TIMESTAMP}*\n\n${DIFF_COMMENT}\n"
+
+          if [ -n "$COMMENT_ID" ]; then
+            gh pr comment edit $COMMENT_ID --repo ${{ github.repository }} --body "$FULL_COMMENT_BODY"
+          else
+            gh pr comment create ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --body "$FULL_COMMENT_BODY"
+          fi
+        else
+          echo "No meaningful notebook diffs to comment on."
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      shell: bash
