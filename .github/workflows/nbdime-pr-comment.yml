@@ -1,4 +1,4 @@
-name: Notebook Diff as Commit File
+name: Clean Notebook Diff as File
 
 on:
   pull_request:
@@ -14,35 +14,55 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Python and install nbdime
+      - name: Setup Python and install tools
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
-      - name: Install nbdime
+      - name: Install nbdime and nbstripout
         run: |
-          python -m pip install --upgrade pip
-          pip install nbdime
+          pip install --upgrade pip
+          pip install nbdime nbstripout
 
-      - name: Generate notebook diff file
+      - name: Generate clean notebook diff
         run: |
+          mkdir -p tmp_base tmp_head nb_diff
           DIFF_FILE="nb_diff/changes_for_pr_${{ github.event.pull_request.number }}.diff"
-          mkdir -p nb_diff
-          # Generate diff between PR base and head for all notebooks
-          python3 -m nbdime diff --no-color origin/${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.head.ref }} . > "$DIFF_FILE" || true
+          > "$DIFF_FILE"
 
-      - name: Commit and push diff file if changed
+          # Get list of changed notebooks
+          NOTEBOOKS=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD | grep '\.ipynb$' || true)
+
+          for nb in $NOTEBOOKS; do
+            echo "Processing $nb"
+
+            mkdir -p "tmp_base/$(dirname "$nb")"
+            mkdir -p "tmp_head/$(dirname "$nb")"
+
+            # Base version → stripped
+            git show origin/${{ github.event.pull_request.base.ref }}:"$nb" > "tmp_base/$nb" || continue
+            nbstripout --extra-keys metadata,execution_count "tmp_base/$nb"
+
+            # Head version → stripped
+            cp "$nb" "tmp_head/$nb"
+            nbstripout --extra-keys metadata,execution_count "tmp_head/$nb"
+
+            echo -e "\n### Diff for \`$nb\`\n\`\`\`diff" >> "$DIFF_FILE"
+            python3 -m nbdime diff --no-color "tmp_base/$nb" "tmp_head/$nb" >> "$DIFF_FILE" || echo "Error diffing $nb" >> "$DIFF_FILE"
+            echo -e "\`\`\`\n---" >> "$DIFF_FILE"
+          done
+
+      - name: Commit and push diff file
         if: github.event.pull_request.head.repo.full_name == github.repository
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          DIFF_FILE="nb_diff/changes_for_pr_${{ github.event.pull_request.number }}.diff"
-          git add "$DIFF_FILE"
+          git add nb_diff/changes_for_pr_${{ github.event.pull_request.number }}.diff
           if ! git diff --cached --quiet; then
-            git commit -m "Add notebook diff for PR #${{ github.event.pull_request.number }}"
+            git commit -m "Add cleaned notebook diff for PR #${{ github.event.pull_request.number }}"
             git push origin HEAD:${{ github.event.pull_request.head.ref }}
           else
-            echo "No changes in diff file, skipping commit."
+            echo "No changes to diff file. Skipping commit."
           fi
 
   cleanup_diff:
@@ -54,7 +74,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Remove notebook diff file on PR close
+      - name: Remove notebook diff file
         if: github.event.pull_request.head.repo.full_name == github.repository
         run: |
           git config user.name "github-actions[bot]"
