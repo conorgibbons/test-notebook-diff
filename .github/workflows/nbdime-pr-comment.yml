@@ -44,7 +44,8 @@ jobs:
             git show ${{ github.event.pull_request.base.sha }}:"$nb" > base_notebooks/"$nb" || continue
             cp "$nb" pr_notebooks/"$nb"
 
-            NB_DIFF=$(nbdime diff --strip-outputs --strip-metadata --no-color base_notebooks/"$nb" pr_notebooks/"$nb")
+            NB_DIFF=$(nbdiff --strip-outputs --strip-metadata --no-color base_notebooks/"$nb" pr_notebooks/"$nb")
+
             if [ -n "$NB_DIFF" ]; then
               DIFF_COMMENT="${DIFF_COMMENT}\n---\n### \`${nb}\`\n\`\`\`diff\n${NB_DIFF}\n\`\`\`\n"
             fi
