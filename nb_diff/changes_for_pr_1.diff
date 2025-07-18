@@ -1,20 +1,9 @@
-nbdiff nb1.ipynb (origin/main) nb1.ipynb
---- nb1.ipynb (origin/main)  (no timestamp)
-+++ nb1.ipynb  2025-07-18 14:58:23.217474
-## replaced (type changed from NoneType to int) /cells/0/execution_count:
--  None
-+  1
 
-## inserted before /cells/0/outputs/0:
-+  output:
-+    output_type: stream
-+    name: stdout
-+    text:
-+         col_A  col_B
-+      0     10     40
-+      1     20     50
-+      2     30     60
-
+### Diff for `nb1.ipynb`
+```diff
+nbdiff tmp_base/nb1.ipynb tmp_head/nb1.ipynb
+--- tmp_base/nb1.ipynb  2025-07-18 15:05:36.805829
++++ tmp_head/nb1.ipynb  2025-07-18 15:05:37.044833
 ## modified /cells/0/source:
 @@ -1,4 +1,4 @@
 -# Initial code
@@ -26,8 +15,10 @@ nbdiff nb1.ipynb (origin/main) nb1.ipynb
 
 ## inserted before /cells/1:
 +  code cell:
-+    id: c1415e94-0c76-4f48-8dcc-c04cd6131ef2
++    id: 1
 +    source:
 +      # New cell
 +      print("This is a new feature!")
 
+```
+---
