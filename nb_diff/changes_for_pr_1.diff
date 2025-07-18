@@ -1,9 +1,6 @@
 
 ### Diff for `nb1.ipynb`
 ```diff
-nbdiff tmp_base/nb1.ipynb tmp_head/nb1.ipynb
---- tmp_base/nb1.ipynb  2025-07-18 15:05:36.805829
-+++ tmp_head/nb1.ipynb  2025-07-18 15:05:37.044833
 ## modified /cells/0/source:
 @@ -1,4 +1,4 @@
 -# Initial code
@@ -19,6 +16,5 @@ nbdiff tmp_base/nb1.ipynb tmp_head/nb1.ipynb
 +    source:
 +      # New cell
 +      print("This is a new feature!")
-
 ```
 ---
