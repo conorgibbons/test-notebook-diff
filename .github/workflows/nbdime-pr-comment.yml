@@ -14,7 +14,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Python and install tools
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
@@ -30,7 +30,7 @@ jobs:
           DIFF_FILE="nb_diff/changes_for_pr_${{ github.event.pull_request.number }}.diff"
           > "$DIFF_FILE"
 
-          # Get list of changed notebooks
+          # Find changed notebooks
           NOTEBOOKS=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD | grep '\.ipynb$' || true)
 
           for nb in $NOTEBOOKS; do
@@ -39,17 +39,21 @@ jobs:
             mkdir -p "tmp_base/$(dirname "$nb")"
             mkdir -p "tmp_head/$(dirname "$nb")"
 
-            # Base version → stripped
+            # Save base version and strip outputs/metadata
             git show origin/${{ github.event.pull_request.base.ref }}:"$nb" > "tmp_base/$nb" || continue
             nbstripout --extra-keys metadata,execution_count "tmp_base/$nb"
 
-            # Head version → stripped
+            # Save head version and strip outputs/metadata
             cp "$nb" "tmp_head/$nb"
             nbstripout --extra-keys metadata,execution_count "tmp_head/$nb"
 
-            echo -e "\n### Diff for \`$nb\`\n\`\`\`diff" >> "$DIFF_FILE"
-            python3 -m nbdime diff --no-color "tmp_base/$nb" "tmp_head/$nb" >> "$DIFF_FILE" || echo "Error diffing $nb" >> "$DIFF_FILE"
-            echo -e "\`\`\`\n---" >> "$DIFF_FILE"
+            # Generate stripped diff and skip empty ones
+            DIFF=$(python3 -m nbdime diff --no-color "tmp_base/$nb" "tmp_head/$nb" | tail -n +4)
+            if [ -n "$DIFF" ]; then
+              echo -e "\n### Diff for \`$nb\`\n\`\`\`diff\n$DIFF\n\`\`\`\n---" >> "$DIFF_FILE"
+            else
+              echo "No meaningful diff in $nb"
+            fi
           done
 
       - name: Commit and push diff file
@@ -62,7 +66,7 @@ jobs:
             git commit -m "Add cleaned notebook diff for PR #${{ github.event.pull_request.number }}"
             git push origin HEAD:${{ github.event.pull_request.head.ref }}
           else
-            echo "No changes to diff file. Skipping commit."
+            echo "No changes to commit."
           fi
 
   cleanup_diff:
