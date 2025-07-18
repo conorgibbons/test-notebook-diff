@@ -1,61 +1,93 @@
-# .github/workflows/nbdime-pr-comment.yml
-name: Jupyter Notebook Diff on PR
+name: Clean Notebook Diff as File
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, closed]
 
 jobs:
-  generate_nb_diff:
+  generate_diff:
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0 # Needed to compare with base branch
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.x'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
-    - name: Install nbdime
-      run: pip install nbdime
+      - name: Install nbdime and nbstripout
+        run: |
+          pip install --upgrade pip
+          pip install nbdime nbstripout
 
-    - name: Get changed notebooks
-      id: changed_files
-      run: |
-        COMMITS=$(git diff --name-only ${{ github.event.before }} ${{ github.event.after }} | grep ".ipynb$" | xargs)
-        echo "changed_notebooks=$COMMITS" >> $GITHUB_OUTPUT
-      shell: bash
+      - name: Generate clean notebook diff
+        run: |
+          mkdir -p tmp_base tmp_head nb_diff
+          DIFF_FILE="nb_diff/changes_for_pr_${{ github.event.pull_request.number }}.diff"
+          > "$DIFF_FILE"
 
-    - name: Generate and Comment nbdime diff
-      if: steps.changed_files.outputs.changed_notebooks != ''
-      run: |
-        DIFF_COMMENT=""
-        for NOTEBOOK_PATH in ${{ steps.changed_files.outputs.changed_notebooks }}; do
-          NB_DIFF=$(nbdime diff --output-none --no-metadata --no-color ${{ github.event.base.sha }} $NOTEBOOK_PATH)
-          if [ -n "$NB_DIFF" ]; then
-            DIFF_COMMENT="${DIFF_COMMENT}\n---\n### Code Changes for \`${NOTEBOOK_PATH}\`\n\`\`\`diff\n${NB_DIFF}\n\`\`\`\n"
-          fi
-        done
+          # Find changed notebooks
+          NOTEBOOKS=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD | grep '\.ipynb$' || true)
 
-        if [ -n "$DIFF_COMMENT" ]; then
-          # Get the existing comment ID if any, to update it instead of creating new ones
-          COMMENT_ID=$(gh pr comment list ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json id,body -q '.[] | select(.body | contains("")) | .id' || true)
+          for nb in $NOTEBOOKS; do
+            echo "Processing $nb"
 
-          # Add a timestamp to indicate when the diff was last updated
-          CURRENT_TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+            mkdir -p "tmp_base/$(dirname "$nb")"
+            mkdir -p "tmp_head/$(dirname "$nb")"
 
-          FULL_COMMENT_BODY="This comment shows the code-only diff for Jupyter notebooks in this PR.\n*Last updated: ${CURRENT_TIMESTAMP}*\n\n${DIFF_COMMENT}\n"
+            # Save base version and strip outputs/metadata
+            git show origin/${{ github.event.pull_request.base.ref }}:"$nb" > "tmp_base/$nb" || continue
+            nbstripout --extra-keys metadata,execution_count "tmp_base/$nb"
 
-          if [ -n "$COMMENT_ID" ]; then
-            gh pr comment edit $COMMENT_ID --repo ${{ github.repository }} --body "$FULL_COMMENT_BODY"
+            # Save head version and strip outputs/metadata
+            cp "$nb" "tmp_head/$nb"
+            nbstripout --extra-keys metadata,execution_count "tmp_head/$nb"
+
+            # Generate stripped diff and skip empty ones
+            DIFF=$(python3 -m nbdime diff --no-color "tmp_base/$nb" "tmp_head/$nb" | tail -n +4)
+            if [ -n "$DIFF" ]; then
+              echo -e "\n### Diff for \`$nb\`\n\`\`\`diff\n$DIFF\n\`\`\`\n---" >> "$DIFF_FILE"
+            else
+              echo "No meaningful diff in $nb"
+            fi
+          done
+
+      - name: Commit and push diff file
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add nb_diff/changes_for_pr_${{ github.event.pull_request.number }}.diff
+          if ! git diff --cached --quiet; then
+            git commit -m "Add cleaned notebook diff for PR #${{ github.event.pull_request.number }}"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
           else
-            gh pr comment create ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --body "$FULL_COMMENT_BODY"
+            echo "No changes to commit."
           fi
-        else
-          echo "No meaningful notebook diffs to comment on."
-        fi
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      shell: bash
+
+  cleanup_diff:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Remove notebook diff file
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          DIFF_FILE="nb_diff/changes_for_pr_${{ github.event.pull_request.number }}.diff"
+          if [ -f "$DIFF_FILE" ]; then
+            git rm "$DIFF_FILE"
+            git commit -m "Remove notebook diff file for closed PR #${{ github.event.pull_request.number }}"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          else
+            echo "No diff file to remove."
+          fi
