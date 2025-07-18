@@ -12,40 +12,54 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Full history for accurate diffs
+          fetch-depth: 0
 
-      - name: Set up Python and install tools
+      - name: Set up Python and install nbdime
         run: |
           python3 -m pip install --upgrade pip
           pip install nbdime
 
-      - name: Prepare base and head
+      - name: Prepare base and head versions of notebooks
         run: |
           mkdir -p changelog/notebooks
+          
+          # Save the base branch notebooks
           git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
-          git checkout ${{ github.event.pull_request.base.ref }}
-          cp -r notebooks base_notebooks
+          git checkout FETCH_HEAD
+          find . -maxdepth 1 -name '*.ipynb' -exec cp {} base_{} \;
 
+          # Save the PR branch notebooks
           git checkout ${{ github.event.pull_request.head.ref }}
-          cp -r notebooks pr_notebooks
+          find . -maxdepth 1 -name '*.ipynb' -exec cp {} pr_{} \;
 
-      - name: Generate nbdime diff
+      - name: Generate nbdime diffs
         run: |
-          python3 -m nbdime diff -OAMID --no-color base_notebooks pr_notebooks > changelog/notebooks/changes.diff || echo "No diff output"
+          touch changelog/notebooks/changes.diff
+          echo "" > changelog/notebooks/changes.diff
 
-      - name: Post diff as comment
+          for base_file in base_*.ipynb; do
+            pr_file="pr_${base_file#base_}"
+            if [ -f "$pr_file" ]; then
+              echo "### Diff: ${pr_file#pr_}" >> changelog/notebooks/changes.diff
+              python3 -m nbdime diff -OAMID --no-color "$base_file" "$pr_file" >> changelog/notebooks/changes.diff || true
+              echo -e "\n---\n" >> changelog/notebooks/changes.diff
+            fi
+          done
+
+      - name: Post diff as PR comment
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ -s changelog/notebooks/changes.diff ]; then
-            COMMENT_BODY=$(echo -e "### 📘 Jupyter Notebook Diff\n\`\`\`diff\n$(cat changelog/notebooks/changes.diff | head -c 60000)\n\`\`\`")
+            DIFF_OUTPUT=$(head -c 60000 changelog/notebooks/changes.diff)
+            COMMENT="### 📘 Jupyter Notebook Diff\n\`\`\`diff\n$DIFF_OUTPUT\n\`\`\`"
 
-            # Truncate comment if too large
-            if [ $(cat changelog/notebooks/changes.diff | wc -c) -gt 60000 ]; then
-              COMMENT_BODY="${COMMENT_BODY}\n\n⚠️ Diff truncated due to size limit."
+            # Warn if diff was truncated
+            if [ $(wc -c < changelog/notebooks/changes.diff) -gt 60000 ]; then
+              COMMENT="${COMMENT}\n\n⚠️ Diff truncated to 60,000 characters."
             fi
 
-            gh pr comment ${{ github.event.pull_request.number }} --body "$COMMENT_BODY"
+            gh pr comment ${{ github.event.pull_request.number }} --body "$COMMENT"
           else
-            echo "No notebook diff to comment."
+            echo "No diff output to post."
           fi
