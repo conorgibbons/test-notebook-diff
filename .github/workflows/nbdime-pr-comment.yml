@@ -1,84 +1,69 @@
-name: Notebook Diff on PR
+name: Notebook Diff as Commit File
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
-
-permissions:
-  contents: read
-  pull-requests: write
-  issues: write
+    types: [opened, synchronize, reopened, closed]
 
 jobs:
-  notebook_diff:
+  generate_diff:
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history needed for diffing
+          fetch-depth: 0
 
-      - name: Set up Python environment and install dependencies
+      - name: Setup Python and install nbdime
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install nbdime
         run: |
           python -m pip install --upgrade pip
-          pip install nbdime nbstripout jq
+          pip install nbdime
 
-      - name: Get list of changed notebooks
+      - name: Generate notebook diff file
         run: |
-          git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
-          git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD | grep '\.ipynb$' > changed_notebooks.txt || true
-          echo "Changed notebooks:"
-          if [ -s changed_notebooks.txt ]; then
-            cat changed_notebooks.txt
+          DIFF_FILE="nb_diff/changes_for_pr_${{ github.event.pull_request.number }}.diff"
+          mkdir -p nb_diff
+          # Generate diff between PR base and head for all notebooks
+          python3 -m nbdime diff --no-color origin/${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.head.ref }} . > "$DIFF_FILE" || true
+
+      - name: Commit and push diff file if changed
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          DIFF_FILE="nb_diff/changes_for_pr_${{ github.event.pull_request.number }}.diff"
+          git add "$DIFF_FILE"
+          if ! git diff --cached --quiet; then
+            git commit -m "Add notebook diff for PR #${{ github.event.pull_request.number }}"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
           else
-            echo "No notebooks changed in this PR."
+            echo "No changes in diff file, skipping commit."
           fi
 
+  cleanup_diff:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Prepare stripped copies for diffing
-        run: |
-          mkdir -p tmp_base tmp_head diff_output
-          while IFS= read -r nb; do
-            if git show origin/${{ github.event.pull_request.base.ref }}:"$nb" &> /dev/null && [ -f "$nb" ]; then
-              mkdir -p "tmp_base/$(dirname "$nb")" "tmp_head/$(dirname "$nb")"
-              git show origin/${{ github.event.pull_request.base.ref }}:"$nb" > tmp_base/"$nb"
-              cp "$nb" tmp_head/"$nb"
-              nbstripout tmp_base/"$nb"
-              nbstripout tmp_head/"$nb"
-            fi
-          done < changed_notebooks.txt
-
-      - name: Generate notebook diffs
-        run: |
-          > diff_output/notebook_diff.txt
-          while IFS= read -r nb; do
-            base_file="tmp_base/$nb"
-            head_file="tmp_head/$nb"
-            if [[ -f "$base_file" && -f "$head_file" ]]; then
-              echo -e "\n### Diff for \`$nb\`\n\`\`\`diff" >> diff_output/notebook_diff.txt
-              python3 -m nbdime diff --no-color "$base_file" "$head_file" >> diff_output/notebook_diff.txt || echo "Error diffing $nb"
-              echo -e "\`\`\`\n---" >> diff_output/notebook_diff.txt
-            fi
-          done < changed_notebooks.txt
-
-      - name: Post notebook diff as PR comment (same repo PRs only)
+      - name: Remove notebook diff file on PR close
         if: github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          if [ -s diff_output/notebook_diff.txt ]; then
-            COMMENT_BODY=$(head -c 60000 diff_output/notebook_diff.txt | sed 's/"/\\"/g' | sed "s/'/\\'/g" | tr -d '\r\n')
-            # Using JSON payload with escaped newlines for safe posting
-            PAYLOAD=$(jq -nc --arg body "📘 Jupyter Notebook Changes\n\n$(head -c 60000 diff_output/notebook_diff.txt)" '{body:$body}')
-
-            curl -s -X POST \
-              -H "Authorization: token $GITHUB_TOKEN" \
-              -H "Accept: application/vnd.github.v3+json" \
-              "https://api.github.com/repos/$REPO/issues/$PR_NUMBER/comments" \
-              -d "$PAYLOAD"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          DIFF_FILE="nb_diff/changes_for_pr_${{ github.event.pull_request.number }}.diff"
+          if [ -f "$DIFF_FILE" ]; then
+            git rm "$DIFF_FILE"
+            git commit -m "Remove notebook diff file for closed PR #${{ github.event.pull_request.number }}"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
           else
-            echo "No notebook changes to comment."
+            echo "No diff file to remove."
           fi
