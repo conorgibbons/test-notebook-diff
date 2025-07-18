@@ -1,4 +1,3 @@
-# .github/workflows/nbdime-pr-comment.yml
 name: Jupyter Notebook Diff on PR
 
 on:
@@ -6,56 +5,47 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  generate_nb_diff:
+  notebook_diff:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout PR code
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # needed to access both HEAD and base
+          fetch-depth: 0 # Full history for accurate diffs
 
-      - name: Set up Python and Install nbdime
+      - name: Set up Python and install tools
         run: |
-          python -m pip install --upgrade pip
+          python3 -m pip install --upgrade pip
           pip install nbdime
 
-      - name: Get changed notebooks
-        id: changed
+      - name: Prepare base and head
         run: |
-          NOTEBOOKS=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep '.ipynb$' || true)
-          echo "$NOTEBOOKS"
-          echo "notebooks<<EOF" >> $GITHUB_OUTPUT
-          echo "$NOTEBOOKS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          mkdir -p changelog/notebooks
+          git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
+          git checkout ${{ github.event.pull_request.base.ref }}
+          cp -r notebooks base_notebooks
 
-      - name: Generate and comment notebook diffs
-        if: steps.changed.outputs.notebooks != ''
+          git checkout ${{ github.event.pull_request.head.ref }}
+          cp -r notebooks pr_notebooks
+
+      - name: Generate nbdime diff
+        run: |
+          python3 -m nbdime diff -OAMID --no-color base_notebooks pr_notebooks > changelog/notebooks/changes.diff || echo "No diff output"
+
+      - name: Post diff as comment
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # <-- Use this instead of gh auth login
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          DIFF_COMMENT=""
-          mkdir -p base_notebooks pr_notebooks
+          if [ -s changelog/notebooks/changes.diff ]; then
+            COMMENT_BODY=$(echo -e "### 📘 Jupyter Notebook Diff\n\`\`\`diff\n$(cat changelog/notebooks/changes.diff | head -c 60000)\n\`\`\`")
 
-          while IFS= read -r nb; do
-            mkdir -p "$(dirname base_notebooks/$nb)"
-            mkdir -p "$(dirname pr_notebooks/$nb)"
-
-            git show ${{ github.event.pull_request.base.sha }}:"$nb" > base_notebooks/"$nb" || continue
-            cp "$nb" pr_notebooks/"$nb"
-
-            NB_DIFF=$(nbdiff --strip-outputs --strip-metadata --no-color base_notebooks/"$nb" pr_notebooks/"$nb")
-
-            if [ -n "$NB_DIFF" ]; then
-              DIFF_COMMENT="${DIFF_COMMENT}\n---\n### \`${nb}\`\n\`\`\`diff\n${NB_DIFF}\n\`\`\`\n"
+            # Truncate comment if too large
+            if [ $(cat changelog/notebooks/changes.diff | wc -c) -gt 60000 ]; then
+              COMMENT_BODY="${COMMENT_BODY}\n\n⚠️ Diff truncated due to size limit."
             fi
-          done <<< "${{ steps.changed.outputs.notebooks }}"
 
-          if [ -n "$DIFF_COMMENT" ]; then
-            TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
-            BODY="This comment shows code-only diffs for Jupyter notebooks.\n_Last updated: $TIMESTAMP_\n\n${DIFF_COMMENT}"
-
-            gh pr comment ${{ github.event.pull_request.number }} --body "$BODY"
+            gh pr comment ${{ github.event.pull_request.number }} --body "$COMMENT_BODY"
           else
-            echo "No notebook diffs to show."
+            echo "No notebook diff to comment."
           fi
