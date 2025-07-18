@@ -27,9 +27,14 @@ jobs:
       - name: Get list of changed notebooks
         run: |
           git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
-          git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD | grep '\.ipynb$' || true > changed_notebooks.txt
+          git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD | grep '\.ipynb$' > changed_notebooks.txt || true
           echo "Changed notebooks:"
-          cat changed_notebooks.txt
+          if [ -s changed_notebooks.txt ]; then
+            cat changed_notebooks.txt
+          else
+            echo "No notebooks changed in this PR."
+          fi
+
 
       - name: Prepare stripped copies for diffing
         run: |
