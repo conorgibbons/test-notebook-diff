@@ -16,5 +16,9 @@
 +    source:
 +      # New cell
 +      print("This is a new feature!")
++  code cell:
++    id: 2
++    source:
++      hi
 ```
 ---
