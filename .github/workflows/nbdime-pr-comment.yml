@@ -20,20 +20,26 @@ jobs:
 
       - name: Install and Verify nbdime
         run: |
-          # Install nbdime, ensuring it's the latest stable version
+          # Create a virtual environment for isolated installation
+          python -m venv venv_nbdime
+          # Activate the virtual environment
+          source venv_nbdime/bin/activate
+          # Upgrade pip within the virtual environment for best practices
+          pip install --upgrade pip
+          # Install nbdime into the virtual environment, ensuring the latest stable version
           pip install --upgrade nbdime
-          # Print the installed nbdime version for debugging
+          # Verify nbdime installation by printing its version
           nbdime --version
-          # Print the help for the 'diff' subcommand to see supported arguments
+          # Print help for the 'diff' subcommand to confirm argument support
           nbdime diff --help
+          # Deactivate the virtual environment
+          deactivate
         shell: bash # Use bash shell for these commands
 
       - name: Get changed notebooks
         id: changed_files # Assign an ID to this step to access its outputs
         run: |
-          # Use git diff to find names of .ipynb files that have changed between the PR's base and head
-          # ${{ github.event.pull_request.base.sha }} is the commit SHA of the base branch
-          # ${{ github.event.pull_request.head.sha }} is the commit SHA of the PR's head branch
+          # Compare the head of the PR branch to the base branch it's merging into
           CHANGED_NOTEBOOKS=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep ".ipynb$")
           # Set the list of changed notebooks as an output for subsequent steps
           echo "changed_notebooks=$CHANGED_NOTEBOOKS" >> "$GITHUB_OUTPUT"
@@ -43,6 +49,9 @@ jobs:
         # This step only runs if there are actual changed notebooks identified in the previous step
         if: steps.changed_files.outputs.changed_notebooks != ''
         run: |
+          # Re-activate the virtual environment to ensure nbdime is in path for this step
+          source venv_nbdime/bin/activate
+          
           DIFF_COMMENT=""
           # Loop through each changed notebook path
           for NOTEBOOK_PATH in ${{ steps.changed_files.outputs.changed_notebooks }}; do
