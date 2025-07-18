@@ -22,13 +22,13 @@ jobs:
       - name: Prepare base and head versions of notebooks
         run: |
           mkdir -p changelog/notebooks
-          
-          # Save the base branch notebooks
+
+          # Get base branch and copy base notebooks
           git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
           git checkout FETCH_HEAD
           find . -maxdepth 1 -name '*.ipynb' -exec cp {} base_{} \;
 
-          # Save the PR branch notebooks
+          # Checkout PR branch and copy PR notebooks
           git checkout ${{ github.event.pull_request.head.ref }}
           find . -maxdepth 1 -name '*.ipynb' -exec cp {} pr_{} \;
 
@@ -46,7 +46,8 @@ jobs:
             fi
           done
 
-      - name: Post diff as PR comment
+      - name: Post diff as PR comment (same repo only)
+        if: github.event.pull_request.head.repo.full_name == github.repository
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -54,12 +55,11 @@ jobs:
             DIFF_OUTPUT=$(head -c 60000 changelog/notebooks/changes.diff)
             COMMENT="### 📘 Jupyter Notebook Diff\n\`\`\`diff\n$DIFF_OUTPUT\n\`\`\`"
 
-            # Warn if diff was truncated
             if [ $(wc -c < changelog/notebooks/changes.diff) -gt 60000 ]; then
               COMMENT="${COMMENT}\n\n⚠️ Diff truncated to 60,000 characters."
             fi
 
             gh pr comment ${{ github.event.pull_request.number }} --body "$COMMENT"
           else
-            echo "No diff output to post."
+            echo "No notebook diff to comment."
           fi
