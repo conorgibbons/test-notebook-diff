@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: notebook-diff
+        name: Generate cleaned notebook diff
+        entry: scripts/gen_notebook_diff.sh
+        language: system
+        types: [file]  # fallback type
+        files: \.ipynb$  # regex to match notebook files
