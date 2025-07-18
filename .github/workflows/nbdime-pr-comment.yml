@@ -32,12 +32,10 @@ jobs:
       - name: Generate and comment notebook diffs
         if: steps.changed.outputs.notebooks != ''
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # <-- Use this instead of gh auth login
         run: |
-          gh auth login --with-token <<< "$GITHUB_TOKEN"
-
           DIFF_COMMENT=""
-          mkdir base_notebooks pr_notebooks
+          mkdir -p base_notebooks pr_notebooks
 
           while IFS= read -r nb; do
             mkdir -p "$(dirname base_notebooks/$nb)"
