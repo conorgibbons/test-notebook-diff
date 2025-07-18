@@ -1,4 +1,4 @@
-name: Jupyter Notebook Diff on PR
+name: Notebook Diff in PR
 
 on:
   pull_request:
@@ -12,54 +12,47 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Full history needed for base comparison
 
-      - name: Set up Python and install nbdime
+      - name: Set up Python and install nbdime + nbstripout
         run: |
-          python3 -m pip install --upgrade pip
-          pip install nbdime
+          pip install nbdime nbstripout
 
-      - name: Prepare base and head versions of notebooks
+      - name: Generate stripped copies of base and head notebooks
         run: |
-          mkdir -p changelog/notebooks
+          mkdir -p diff_output
 
-          # Get base branch and copy base notebooks
-          git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
-          git checkout FETCH_HEAD
-          find . -maxdepth 1 -name '*.ipynb' -exec cp {} base_{} \;
+          # Get list of changed notebooks
+          git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD \
+            | grep '\.ipynb$' > changed_files.txt || true
 
-          # Checkout PR branch and copy PR notebooks
-          git checkout ${{ github.event.pull_request.head.ref }}
-          find . -maxdepth 1 -name '*.ipynb' -exec cp {} pr_{} \;
+          while IFS= read -r nb; do
+            # Make sure the file exists in both branches
+            if git show origin/${{ github.event.pull_request.base.ref }}:"$nb" &> /dev/null && [ -f "$nb" ]; then
+              mkdir -p "tmp_base/$(dirname "$nb")" "tmp_head/$(dirname "$nb")"
 
-      - name: Generate nbdime diffs
-        run: |
-          touch changelog/notebooks/changes.diff
-          echo "" > changelog/notebooks/changes.diff
+              git show origin/${{ github.event.pull_request.base.ref }}:"$nb" > tmp_base/"$nb"
+              cp "$nb" tmp_head/"$nb"
 
-          for base_file in base_*.ipynb; do
-            pr_file="pr_${base_file#base_}"
-            if [ -f "$pr_file" ]; then
-              echo "### Diff: ${pr_file#pr_}" >> changelog/notebooks/changes.diff
-              python3 -m nbdime diff -OAMID --no-color "$base_file" "$pr_file" >> changelog/notebooks/changes.diff || true
-              echo -e "\n---\n" >> changelog/notebooks/changes.diff
+              # Strip outputs and metadata for a cleaner code diff
+              nbstripout tmp_base/"$nb"
+              nbstripout tmp_head/"$nb"
+
+              echo -e "\n### Diff for \`$nb\`\n\`\`\`diff" >> diff_output/notebook_diff.txt
+              python3 -m nbdime diff --no-color tmp_base/"$nb" tmp_head/"$nb" >> diff_output/notebook_diff.txt || echo "Error diffing $nb"
+              echo -e "\`\`\`\n---" >> diff_output/notebook_diff.txt
             fi
-          done
+          done < changed_files.txt
 
-      - name: Post diff as PR comment (same repo only)
+      - name: Comment notebook diff on PR (for same-repo PRs only)
         if: github.event.pull_request.head.repo.full_name == github.repository
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ -s changelog/notebooks/changes.diff ]; then
-            DIFF_OUTPUT=$(head -c 60000 changelog/notebooks/changes.diff)
-            COMMENT="### 📘 Jupyter Notebook Diff\n\`\`\`diff\n$DIFF_OUTPUT\n\`\`\`"
-
-            if [ $(wc -c < changelog/notebooks/changes.diff) -gt 60000 ]; then
-              COMMENT="${COMMENT}\n\n⚠️ Diff truncated to 60,000 characters."
-            fi
-
-            gh pr comment ${{ github.event.pull_request.number }} --body "$COMMENT"
+          if [ -s diff_output/notebook_diff.txt ]; then
+            COMMENT_BODY=$(head -c 60000 diff_output/notebook_diff.txt)
+            gh pr comment ${{ github.event.pull_request.number }} \
+              --body "📘 Jupyter Notebook Changes\n\n${COMMENT_BODY}"
           else
-            echo "No notebook diff to comment."
+            echo "No notebook changes to comment."
           fi
