@@ -1,0 +1,27 @@
+name: Cleanup notebook diff after PR merge
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Remove notebook diff file
+        run: |
+          FILE="changelog/notebooks/changes.diff"
+          if [ -f "$FILE" ]; then
+            rm "$FILE"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add $FILE
+            git commit -m "Cleanup: remove notebook diff after PR merge"
+            git push
+          else
+            echo "No notebook diff file to clean up."
+          fi
