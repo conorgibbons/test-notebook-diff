@@ -2,12 +2,12 @@
 set -e
 
 # Output file
-DIFF_FILE="notebook-diff/changes.diff"
+DIFF_FILE="changelog/changes.diff"
 BASE_BRANCH="origin/main"
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 # Make sure the directory exists
-mkdir -p notebook-diff
+mkdir -p changelog
 
 # Clear the old diff
 > "$DIFF_FILE"
@@ -31,7 +31,7 @@ for nb in $STAGED_NOTEBOOKS; do
   fi
 
   echo -e "\n\n" >> "$DIFF_FILE"
-  
+
 done
 
 # Stage the diff file so it's included in the commit
