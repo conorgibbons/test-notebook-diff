@@ -2,11 +2,22 @@
 
 --- nb1.ipynb ---
 
-nbdiff nb1.ipynb (feature/update-notebook) nb1.ipynb
---- nb1.ipynb (feature/update-notebook)  (no timestamp)
-+++ nb1.ipynb  2025-07-30 10:25:16.292263
-## inserted before /cells/3:
+nbdiff /dev/fd/63 nb1.ipynb
+--- /dev/fd/63  2025-07-30 11:04:21.188308
++++ nb1.ipynb  2025-07-30 11:04:06.463429
+## inserted before /cells/0:
 +  code cell:
 +    source:
-+      hmmmm
++      based
+
+## deleted /cells/0:
+-  code cell:
+-    source:
+-      # Initial code
+-      import pandas as pd
+-      df = pd.DataFrame({'col1': [1, 2], 'col2': [3, 4]})
+-      print(df)
+
+
+
 
