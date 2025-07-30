@@ -14,7 +14,7 @@ jobs:
 
       - name: Remove notebook diff file
         run: |
-          FILE="changelog/notebooks/changes.diff"
+          FILE="changelog/changes.diff"
           if [ -f "$FILE" ]; then
             rm "$FILE"
             git config user.name "github-actions[bot]"
