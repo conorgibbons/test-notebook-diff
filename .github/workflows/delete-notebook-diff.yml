@@ -3,11 +3,13 @@ name: Delete notebook diff after PR approval
 
 on:
   pull_request_review:
-    types: [submitted]
+    types: [synchronize]
+    # types: [submitted] should be this 
 
 jobs:
   remove-diff:
-    if: github.event.review.state == 'approved'
+    if: always()
+    # if: github.event.review.state == 'approved' shpould be this 
     runs-on: ubuntu-latest
 
     permissions:
