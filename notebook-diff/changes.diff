@@ -4,13 +4,9 @@
 
 nbdiff nb1.ipynb (feature/update-notebook) nb1.ipynb
 --- nb1.ipynb (feature/update-notebook)  (no timestamp)
-+++ nb1.ipynb  2025-07-30 10:22:00.262796
-[34m[1m## inserted before /cells/1:[0m
-[32m+  code cell:
-[32m+    source:
-[32m+      1111
-[32m+  code cell:
-[32m+    source:
-[32m+      does it work?????
++++ nb1.ipynb  2025-07-30 10:25:16.292263
+## inserted before /cells/3:
++  code cell:
++    source:
++      hmmmm
 
-[0m
