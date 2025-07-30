@@ -7,7 +7,7 @@ BASE_BRANCH="origin/main"
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 # Make sure the directory exists
-mkdir -p changelog/notebooks
+mkdir -p notebook-diff
 
 # Clear the old diff
 > "$DIFF_FILE"
