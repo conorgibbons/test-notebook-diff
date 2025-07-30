@@ -27,10 +27,11 @@ for nb in $STAGED_NOTEBOOKS; do
     echo -e "NOTEBOOK: $nb\n" >> "$DIFF_FILE"
     python3 -m nbdime diff -OAMID --no-color <(git show origin/main:$nb) "$nb" >> "$DIFF_FILE"
   else
+    echo -e "NEW NOTEBOOK: $nb\n" >> "$DIFF_FILE"
     python3 -m nbdime diff -OAMID --no-color /dev/null "$nb" >> "$DIFF_FILE"
   fi
 
-  echo -e "\n\n" >> "$DIFF_FILE"
+  echo -e "..........................." >> "$DIFF_FILE"
 
 done
 
