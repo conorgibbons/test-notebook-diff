@@ -23,10 +23,15 @@ fi
 echo "### Notebook Diffs vs $BASE_BRANCH" > "$DIFF_FILE"
 
 for nb in $STAGED_NOTEBOOKS; do
-  if git show "$BASE_BRANCH:$nb" &>/dev/null; then
+  if git cat-file -e origin/main:$nb 2>/dev/null; then
     echo -e "\n--- $nb ---\n" >> "$DIFF_FILE"
-    python3 -m nbdime diff -OAMID --no-color "$CURRENT_BRANCH" -- "$nb" "$BASE_BRANCH" >> "$DIFF_FILE" || true
+    python3 -m nbdime diff -OAMID --no-color <(git show origin/main:$nb) "$nb" >> "$DIFF_FILE"
+  else
+    python3 -m nbdime diff -OAMID --no-color /dev/null "$nb" >> "$DIFF_FILE"
   fi
+
+  echo -e "\n\n" >> "$DIFF_FILE"
+  
 done
 
 # Stage the diff file so it's included in the commit
