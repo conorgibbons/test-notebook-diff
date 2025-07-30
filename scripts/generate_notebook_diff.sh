@@ -1,6 +1,16 @@
 #!/bin/bash
 set -e
 
+# Remove old file if it exists
+rm -f changelog/notebooks/changes.diff
+
+# Start fswatch in the background and log events
+FSWATCH_LOG="/tmp/fswatch-notebooks.log"
+: > "$FSWATCH_LOG"
+
+fswatch --event Created --event Updated --event Removed changelog/notebooks/changes.diff >> "$FSWATCH_LOG" &
+FSWATCH_PID=$!
+
 # Output file
 DIFF_FILE="changelog/changes.diff"
 BASE_BRANCH="origin/main"
@@ -37,4 +47,13 @@ done
 # Stage the diff file so it's included in the commit
 if [ -s "$DIFF_FILE" ]; then
   git add "$DIFF_FILE"
+fi
+
+# Kill fswatch after the script runs
+kill $FSWATCH_PID
+
+# If the file was touched, print who did it
+if [ -s "$FSWATCH_LOG" ]; then
+    echo "📦 changelog/notebooks/changes.diff was created or modified:"
+    cat "$FSWATCH_LOG"
 fi
