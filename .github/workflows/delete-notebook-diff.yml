@@ -1,0 +1,33 @@
+# .github/workflows/delete-notebook-diff.yml
+name: Delete notebook diff after PR approval
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  remove-diff:
+    if: github.event.review.state == 'approved'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write  # Needed to push commits
+      pull-requests: write
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Remove changelog/changes.diff if it exists
+        run: |
+          if [ -f changelog/changes.diff ]; then
+            git rm changelog/changes.diff
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git commit -m "Auto-delete notebook diff after approval"
+            git push origin HEAD
+          else
+            echo "No changes.diff file found — nothing to delete."
+          fi
