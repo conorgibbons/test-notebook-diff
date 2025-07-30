@@ -31,7 +31,7 @@ for nb in $STAGED_NOTEBOOKS; do
     python3 -m nbdime diff -OAMID --no-color /dev/null "$nb" >> "$DIFF_FILE"
   fi
 
-  echo -e "..........................." >> "$DIFF_FILE"
+  echo -e "...........................\n" >> "$DIFF_FILE"
 
 done
 
