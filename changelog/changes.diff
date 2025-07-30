@@ -1,0 +1,36 @@
+### Notebook Diffs vs origin/main
+
+--- nb1.ipynb ---
+
+nbdiff /dev/fd/63 nb1.ipynb
+--- /dev/fd/63  2025-07-30 11:14:01.830795
++++ nb1.ipynb  2025-07-30 11:11:41.144230
+## inserted before /cells/0:
++  code cell:
++    source:
++      1
++  code cell:
++    source:
++      2
++  code cell:
++    source:
++      3
++  code cell:
++    source:
++      4
++  code cell:
++    source:
++      5
++  code cell:
+
+## deleted /cells/0:
+-  code cell:
+-    source:
+-      # Initial code
+-      import pandas as pd
+-      df = pd.DataFrame({'col1': [1, 2], 'col2': [3, 4]})
+-      print(df)
+
+
+
+
