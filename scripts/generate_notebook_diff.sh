@@ -2,8 +2,9 @@
 set -e
 
 # Output file
-DIFF_FILE="changelog/notebooks/changes.diff"
-BASE_BRANCH="master"
+DIFF_FILE="notebook-diff/changes.diff"
+BASE_BRANCH="origin/main"
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 # Make sure the directory exists
 mkdir -p changelog/notebooks
@@ -19,12 +20,12 @@ if [ -z "$STAGED_NOTEBOOKS" ]; then
   exit 0
 fi
 
-echo "### Notebook Diff vs $BASE_BRANCH" > "$DIFF_FILE"
+echo "### Notebook Diffs vs $BASE_BRANCH" > "$DIFF_FILE"
 
 for nb in $STAGED_NOTEBOOKS; do
   if git show "$BASE_BRANCH:$nb" &>/dev/null; then
     echo -e "\n--- $nb ---\n" >> "$DIFF_FILE"
-    python3 -m nbdime diff -OAMID --no-color "$BASE_BRANCH" "$nb" >> "$DIFF_FILE" || true
+    python3 -m nbdime diff -OAMID "$CURRENT_BRANCH" -- "$nb" "$BASE_BRANCH" >> "$DIFF_FILE" || true
   fi
 done
 
