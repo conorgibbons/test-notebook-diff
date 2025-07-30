@@ -24,7 +24,7 @@ echo "### Notebook Diffs vs $BASE_BRANCH" > "$DIFF_FILE"
 
 for nb in $STAGED_NOTEBOOKS; do
   if git cat-file -e origin/main:$nb 2>/dev/null; then
-    echo -e "\n--- $nb ---\n" >> "$DIFF_FILE"
+    echo -e "NOTEBOOK: $nb\n" >> "$DIFF_FILE"
     python3 -m nbdime diff -OAMID --no-color <(git show origin/main:$nb) "$nb" >> "$DIFF_FILE"
   else
     python3 -m nbdime diff -OAMID --no-color /dev/null "$nb" >> "$DIFF_FILE"
