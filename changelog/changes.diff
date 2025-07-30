@@ -3,13 +3,18 @@
 --- nb1.ipynb ---
 
 nbdiff /dev/fd/63 nb1.ipynb
---- /dev/fd/63  2025-07-30 11:46:29.862498
-+++ nb1.ipynb  2025-07-30 11:45:28.949023
+--- /dev/fd/63  2025-07-30 11:55:19.567141
++++ nb1.ipynb  2025-07-30 11:55:10.349127
 ## inserted before /cells/0:
 +  code cell:
 +    source:
 +      'a'
 +  code cell:
++    source:
++      import matplotlib.pyplot as plt 
++  code cell:
++    source:
++      plt.plot(1,1)
 
 ## deleted /cells/0:
 -  code cell:
