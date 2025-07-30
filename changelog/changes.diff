@@ -1,13 +1,11 @@
 ### Notebook Diffs vs origin/main
-NOTEBOOK: nb1.ipynb
-
-nbdiff /dev/fd/63 nb1.ipynb
---- /dev/fd/63  2025-07-30 14:03:49.341951
-+++ nb1.ipynb  2025-07-30 14:03:37.032874
-## inserted before /cells/3:
+nbdiff /dev/null newnew.ipynb
+--- /dev/null  2025-07-30 14:11:31.246634
++++ newnew.ipynb  2025-07-30 14:11:09.449273
+## added /cells:
 +  code cell:
 +    source:
-+      CLEAN UP 
++      new new 
 
 
 
