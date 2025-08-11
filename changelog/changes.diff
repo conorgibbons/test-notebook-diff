@@ -1,0 +1,12 @@
+### Notebook Diffs
+CHANGED NOTEBOOK: newnb.ipynb
+
+nbdiff /dev/fd/63 newnb.ipynb
+--- /dev/fd/63  2025-08-11 13:14:02.670476
++++ newnb.ipynb  2025-08-11 13:13:43.357427
+## modified /cells/1/source:
+-  
++  'editing this first'
+
+...........................
+
