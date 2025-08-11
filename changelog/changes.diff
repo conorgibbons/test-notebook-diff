@@ -1,20 +1,6 @@
 ### Notebook Diffs
-CHANGED NOTEBOOK: newnb.ipynb
+NEW NOTEBOOK: newnb.ipynb
+newnew.ipynb
 
-nbdiff /dev/fd/63 newnb.ipynb
---- /dev/fd/63  2025-08-11 15:59:37.418829
-+++ newnb.ipynb  2025-08-11 15:59:28.015405
-## modified /cells/1/source:
--  
-+  'editing this first'
-
-## inserted before /cells/2:
-+  code cell:
-+    source:
-+      'new edits'
-+  code cell:
-+    source:
-+      'hi'
-
-...........................
-
+Missing file newnb.ipynb
+newnew.ipynb
