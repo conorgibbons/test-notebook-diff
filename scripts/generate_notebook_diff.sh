@@ -1,10 +1,11 @@
 #!/bin/bash
 set -e
 
+# Name of master branch
+MASTER_BRANCH="origin/main"
+
 # Output file
 DIFF_FILE="changelog/changes.diff"
-BASE_BRANCH="origin/main"
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 # Make sure the directory exists
 mkdir -p changelog
@@ -13,26 +14,24 @@ mkdir -p changelog
 > "$DIFF_FILE"
 
 # Get list of staged notebooks
-STAGED_NOTEBOOKS=$(git diff --cached --name-only --diff-filter=ACM | grep '\.ipynb$' || true)
+STAGED_NOTEBOOKS=$(git diff "$MASTER_BRANCH" --name-only --diff-filter=ACM | grep '\.ipynb$' || true)
 
 if [ -z "$STAGED_NOTEBOOKS" ]; then
   echo "No notebook changes to diff."
   exit 0
 fi
 
-echo "### Notebook Diffs vs $BASE_BRANCH" > "$DIFF_FILE"
+echo "### Notebook Diffs" > "$DIFF_FILE"
 
-for nb in $STAGED_NOTEBOOKS; do
-  if git cat-file -e origin/main:$nb 2>/dev/null; then
-    echo -e "NOTEBOOK: $nb\n" >> "$DIFF_FILE"
-    python3 -m nbdime diff -OAMID --no-color <(git show origin/main:$nb) "$nb" >> "$DIFF_FILE"
+for nb in "$STAGED_NOTEBOOKS"; do
+  if git cat-file -e origin/main:"$nb" 2>/dev/null; then
+    echo -e "CHANGED NOTEBOOK: $nb\n" >> "$DIFF_FILE"
+    python3 -m nbdime diff -OAMID --no-color <(git show "$MASTER_BRANCH":"$nb") "$nb" >> "$DIFF_FILE"
   else
     echo -e "NEW NOTEBOOK: $nb\n" >> "$DIFF_FILE"
     python3 -m nbdime diff -OAMID --no-color /dev/null "$nb" >> "$DIFF_FILE"
   fi
-
-  echo -e "..........................." >> "$DIFF_FILE"
-
+  echo -e "...........................\n" >> "$DIFF_FILE"
 done
 
 # Stage the diff file so it's included in the commit
