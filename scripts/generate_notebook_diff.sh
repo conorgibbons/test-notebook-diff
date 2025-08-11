@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+echo "hiii"
+
 # Name of master branch
 MASTER_BRANCH="origin/main"
 
