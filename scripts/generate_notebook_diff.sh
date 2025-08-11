@@ -34,7 +34,7 @@ for nb in "$STAGED_NOTEBOOKS"; do
   echo -e "...........................\n" >> "$DIFF_FILE"
 done
 
-# Stage the diff file so it's included in the commit
-if [ -s "$DIFF_FILE" ]; then
-  git add "$DIFF_FILE"
-fi
+# # Stage the diff file so it's included in the commit
+# if [ -s "$DIFF_FILE" ]; then
+#   git add "$DIFF_FILE"
+# fi
